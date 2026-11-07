@@ -32,8 +32,8 @@ class ImportGraphState(TypedDict):
 #定义了一个对象模板 赋予少量的默认值
 graph_default_state: ImportGraphState = {
     "task_id": "",
-    "is_pdf_read_enabled": False,
-    "is_md_read_enabled": False,
+    "is_pdf_read_enable": False,
+    "is_md_read_enable": False,
     "local_dir": "",
     "local_file_path": "",
     "pdf_path": "",
