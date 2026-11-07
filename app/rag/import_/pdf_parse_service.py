@@ -1,7 +1,6 @@
 import time
 from pathlib import Path
 
-import requests
 
 from app.process.import_.agent.state import ImportGraphState
 from app.rag.import_.config import MINERU_MODEL_VERSION, MINERU_DOWNLOAD_TIMEOUT_SECONDS, MINERU_POLL_TIMEOUT_SECONDS, \
@@ -9,6 +8,7 @@ from app.rag.import_.config import MINERU_MODEL_VERSION, MINERU_DOWNLOAD_TIMEOUT
 from app.shared.runtime.logger import logger,PROJECT_ROOT
 from app.infra.config.providers import infra_config
 import requests
+import shutil   #shell util linux工具
 
 
 def validates_pdf_paths(state: ImportGraphState) -> tuple[Path, Path]:
@@ -161,6 +161,69 @@ def poll_mineru_zip_url(batch_id:str) -> str:
             time.sleep(interval_time)  # 线程休眠!
             continue
 
+
+def down_load_and_extract_md(zip_file_url:str,local_dir_obj:Path,stem:str) -> str:
+    response = requests.get(url=zip_file_url,timeout=MINERU_DOWNLOAD_TIMEOUT_SECONDS)
+    status_code = response.status_code
+    if status_code != 200:
+        logger.error(f"从:{zip_file_url}地址文件,出现网络异常,状态码为:{status_code},业务无法继续,提前终止!")
+        raise RuntimeError(f"从:{zip_file_url}地址文件,出现网络异常,状态码为:{status_code},业务无法继续,提前终止!")
+
+    zip_file_obj:Path = local_dir_obj / f"{stem}.zip"
+    data = response.content #.json() -> minerU json字符串 .text -> 接口 普通字符串 "我爱你中国"!  .content 接口 返回的是字节数据,文件
+    zip_file_obj.write_bytes(data=data)
+
+    #判断文件夹是否存在
+    zip_file_dir:Path = (local_dir_obj / stem)
+    if zip_file_dir.is_dir():
+        #清空内容,删除文件夹
+        shutil.rmtree(zip_file_dir) #递归删除 删除内部文件和和文件夹本身
+    zip_file_dir.mkdir(parents=True,exist_ok=True)
+    #解压方法 shutil.unpack_achieve()
+    #参数一 要解压的文件Path对象或者字符串地址
+    #参数二 要解压到哪个文件夹地址 不需要指定解压类型,自动识别
+    shutil.unpack_archive(zip_file_obj,zip_file_dir)
+    #压缩方法 shutil.make_archieve()
+    #参数一 压缩后的文件名 info
+    #参数二 压缩后的格式 .zip
+    #参数三 压缩哪个文件夹
+    #检查输出文件夹里面是否存在md文件
+    #1. 递归比较后缀名 List[Path] = Path.iterdir() -> 获取文件夹下面的所有文件或者文件夹[不嵌套获取,不从子文件夹里面读取]
+    #2. 获取文件夹下指定的文件类型 Path.glob(*.md) / rglob(*.md)其中最前面的r代表了递归
+    md_list:list[Path] = list(zip_file_dir.rglob("*.md"))
+    if not md_list:
+        logger.error(f"已经将文件解压到了{local_dir_obj}文件夹,但是内部没有md文件,业务无法继续,提前终止!")
+        raise RuntimeError(f"已经将文件解压到了{local_dir_obj}文件夹,但是内部没有md文件,业务无法继续,提前终止!")
+
+    for md_file in md_list:
+        if md_file.stem == stem:#解压的名字直接等于源文件名字
+            logger.info(f"解压后直接存在原文件名({md_file.name}),无需重命名,直接返回即可!")
+            return str(md_file)
+
+    target_md_obj:Path | None = None
+    for md_file in md_list:
+        if md_file.stem == "full":
+            target_md_obj = md_file
+            break
+    if  target_md_obj:
+        #找到了full.md 写重命名规则
+        # full.md -> stem.md
+        #Path.rename() -> 剪切 删除源文件 -> 新文件
+        #注意 返回后的对象才是相应修改后的地址
+        """
+            问题:md在下载的文件中没了,跑到了nodes下面 {node_pdf_to_md所在的文件夹}
+            解释:rename(f"{stem}.md") 使用的是相对地址,相对的不是原文件,是执行文件的文件夹
+            解决:绝对地址 Path .with_name()修改某个文件的文件名 绝对地址.../full.md -> 绝对地址.../xxx.md
+        """
+        new_target_md_obj:Path = target_md_obj.with_name(f"{stem}.md")
+        new_md_obj:Path = target_md_obj.rename(new_target_md_obj)
+        logger.info(f"已经完成full.md重命名,新的文件地址为:{new_md_obj}")
+        return str(new_md_obj)
+    else:
+        #终止业务
+        logger.error(f"解压中的文件夹当中存在{len(md_list)}个md文件,但是没有叫原文件名:{stem}或者full.md,也无法确定哪个文件,业务无法继续,提前终止")
+        raise RuntimeError(f"解压中的文件夹当中存在{len(md_list)}个md文件,但是没有叫原文件名:{stem}或者full.md,也无法确定哪个文件,业务无法继续,提前终止")
+
     """
         我申请文件上传地址 -> minerU -> 上传文件的地址
         我向上传文件的地址 -> 上传文件的地址 -> put(data=文件数据)
@@ -187,4 +250,8 @@ def parse_pdf_to_markdown(state: ImportGraphState) -> ImportGraphState:
     upload_file_to_url(upload_file_url,pdf_path_obj)
     #4. 轮询获取解析结果
     full_zip_url:str = poll_mineru_zip_url(batch_id)
+    #5. 下载并解压和重命名文件
+    md_path:str = down_load_and_extract_md(full_zip_url,local_dir_obj,pdf_path_obj.stem)
+    #6. 更新state md_path
+    state["md_path"] = md_path
     return state
