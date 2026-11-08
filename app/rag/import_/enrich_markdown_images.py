@@ -1,4 +1,5 @@
-from Demos.FileSecurityTest import sd
+from langchain_core.messages import HumanMessage
+from langchain_core.output_parsers import StrOutputParser
 
 from app.process.import_.agent.state import ImportGraphState
 from pathlib import Path
@@ -6,6 +7,10 @@ from pathlib import Path
 from app.rag.import_.config import IMAGE_CONTEXT_CHAR_LENGTH, SUPPORTED_IMAGE_EXTENSIONS
 from app.shared.runtime.logger import logger
 import re
+from app.infra.llm.providers import llm_provider
+from app.shared.runtime.load_prompt import load_prompt
+from mimetypes import guess_type
+import base64
 
 def validates_and_get_data(state: ImportGraphState) -> tuple[str,Path,Path]:
     md_path:str = state.get('md_path')
@@ -57,9 +62,45 @@ def scan_images_info(images_path_obj:Path,md_content:str) -> list[tuple[str,Path
     return images_info_list
 
 
+
+def summary_image_info(images_info:list[tuple[str,Path,tuple[str,str]]],root_folder:str) -> dict[str, str]:
+    images_summary:dict[str, str] = {}
+    vision_model = llm_provider.vision_chat()
+    for image_name,image_path_obj,image_context in images_info:
+
+        image_des = load_prompt("image_summary",image_content = image_context,root_folder=root_folder)
+        image_type:str = guess_type(image_name)[0]
+        image_base64:str = base64.b64encode(image_path_obj.read_bytes()).decode("utf-8")
+        message = HumanMessage(
+            content=[
+                {"type":"text","text":image_des},
+                {"type":"image_url",
+                 "image_url":{"url":f"data:{image_type};base64,{image_base64}"}
+                 },
+            ]
+        )
+        #langchain的调用链
+        #chains = 提示词 | 模型 | 解析器
+        chains = vision_model | StrOutputParser()
+
+        summary:str = chains.invoke([message])
+        #model.invoke([]) -> response -> response.content -> 字符串
+        #chains = vision_model | JsonOutputParser()
+        # model.invoke([]) -> response -> response.content -> 字符串 -> json.load(字符串) -> dict
+        images_summary[image_name] = summary
+        logger.debug(f"图片:{image_name},已经通过视觉模型,进行意图识别,结果为:{summary}")
+    logger.info(f"已经完成{root_folder}文件夹中的所有图片内容总结,总结图片的内容对数为:{len(images_summary)}")
+    return images_summary
+
 def enrich_markdown_images(state: ImportGraphState) -> ImportGraphState:
     #1. 获取参数并校验
     md_content,md_path_obj,images_path_obj = validates_and_get_data(state)
+    #md 没有图片,需要特殊校验和提前终止
+    if not list(images_path_obj.iterdir()):
+        logger.info(f"{md_path_obj}中没有引用任何图片,无需后续图片处理,直接跳转到下一个节点")
+        return state
     #2. 调用方法进行图片信息识别
     images_info_list:list[tuple[str,Path,tuple[str,str]]] = scan_images_info(images_path_obj,md_content)
+    #3. 调用模型进行图片内容总结
+    images_summary:dict[str,str] = summary_image_info(images_info_list,md_path_obj.stem)
     return state

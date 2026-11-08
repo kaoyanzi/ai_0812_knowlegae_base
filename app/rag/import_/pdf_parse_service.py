@@ -153,8 +153,11 @@ def poll_mineru_zip_url(batch_id:str) -> str:
             return full_zip_url
         elif state == "failed":
             #解析失败
-            logger.error(f"文件解析失败,业务无法继续,提前终止!")
-            raise RuntimeError(f"文件解析失败,业务无法继续,提前终止!")
+            err_msg = result.get("err_msg", "MinerU未提供具体原因")
+            logger.error(f"文件解析失败,原因:{err_msg},业务无法继续,提前终止!")
+            raise RuntimeError(f"文件解析失败,原因:{err_msg},业务无法继续,提前终止!")
+            #logger.error(f"文件解析失败,业务无法继续,提前终止!")
+            #raise RuntimeError(f"文件解析失败,业务无法继续,提前终止!")
         else:
             #解析进行中
             logger.info(f"文件正在解析中,当前状态为:{state},稍后重试")
