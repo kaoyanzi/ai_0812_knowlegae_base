@@ -41,7 +41,7 @@ def scan_images_info(images_path_obj:Path,md_content:str) -> list[tuple[str,Path
             continue
 
         image_name = image_file_obj.name
-        match = re.search(r"\!\[.*?\]\(.*?" + re.escape(image_name) + ".*?\)",md_content)
+        match = re.search(r"\!\[.*?\]\(.*?" + re.escape(image_name) + r".*?\)",md_content)
         if not match:
             logger.debug(f"{image_name}没有在md_cont中被使用,跳过,进行下一条处理!")
             continue
