@@ -21,7 +21,7 @@ def validates_and_get_data(state: ImportGraphState) -> tuple[str,str,Path]:
         logger.error(f"md_path指向的地址为{md_path},但是没有对应的文件,业务无法继续,提前终止")
         raise FileNotFoundError(f"md_path指向的地址为{md_path},但是没有对应的文件,业务无法继续,提前终止")
     if not md_content:
-        md_path = md_path_obj.read_text(encoding='utf-8')
+        md_content = md_path_obj.read_text(encoding='utf-8')
         if not md_content:
             logger.error(f"md_content为空,读取md_path依然为空,业务无法继续提前终止")
             raise ValueError(f"md_content为空,读取md_path依然为,业务无法继续提前终止")
@@ -49,7 +49,7 @@ def document_split_by_title(md_content:str) -> list[dict[str,Any]]:
             continue
         logger.debug(f"当前行为有内容的正常行,进行处理!")
         #问题4 md中可能存在##代码块注释
-        if line.startswith("```") and line.startswith("~~~"):
+        if line.startswith("```") or line.startswith("~~~"):
             current_title_lines.append(line)
             is_code = not is_code #取反
             continue
@@ -70,7 +70,7 @@ def document_split_by_title(md_content:str) -> list[dict[str,Any]]:
                 current_title = line
                 continue
             current_title = line
-            current_titile_lines = [line]
+            current_title_lines = [line]
         else:
             current_title_lines.append(line)
     if current_title and len(current_title_lines) > 1:
@@ -95,7 +95,7 @@ def improve_chunk_size(chunks:list[dict[str,Any]]) -> list[dict[str,Any]]:
             final_chunks.append(chunk)
     logger.info(f"按标题切割但是没有合并的数据长度:{len(final_chunks)}")
     #合并
-    final_chunks = _content_split(final_chunks)
+    final_chunks = _content_merge(final_chunks)
     logger.info(f"按标题切割也进行了合并的数据长度:{len(final_chunks)}")
     return final_chunks
 
@@ -153,7 +153,7 @@ def _content_merge(final_chunks:list[dict[str,Any]]) -> list[dict[str,Any]]:
         #第二次循环
         if len(base_chunk.get("content")) < CHUNK_MIN:
             if base_chunk.get("parent_title") and base_chunk.get("parent_title") == next_chunk.get("parent_title"):
-                if (len(base_chunk.get("title")) + len(next_chunk.get("title"))) < CHUNK_MAX_SIZE:
+                if (len(base_chunk.get("content")) + len(next_chunk.get("content"))) < CHUNK_MAX_SIZE:
                     #真的可以合并
                     base_chunk["content"] = base_chunk.get("content") + "\n" + next_chunk.get("content")
                 else:

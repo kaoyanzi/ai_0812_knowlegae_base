@@ -24,3 +24,6 @@ CHUNK_SIZE = 600
 CHUNK_OVERLAP = 50
 # 最小碎片阈值：低于这个长度判定为短碎片，需要尝试合并
 CHUNK_MIN = 400
+
+# item_name 做识别的时候,截取chunks的前几个对应的切块
+ITEM_NAME_RECOGNITION_CHUNKS_TOP_K = 5
