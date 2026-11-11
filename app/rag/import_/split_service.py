@@ -4,11 +4,12 @@ from app.process.import_.agent.state import ImportGraphState
 from pathlib import Path
 
 from app.rag.import_.config import CHUNK_SIZE, CHUNK_OVERLAP, CHUNK_MAX_SIZE, CHUNK_MIN
-from app.shared.runtime.logger import  logger
+from app.shared.runtime.logger import logger, step_log
 from typing import Any
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import re
 
+@step_log("validates_and_get_data")
 def validates_and_get_data(state: ImportGraphState) -> tuple[str,str,Path]:
     md_content = state.get('md_content')
     md_path = state.get('md_path')
@@ -32,6 +33,7 @@ def validates_and_get_data(state: ImportGraphState) -> tuple[str,str,Path]:
 
     return md_content, file_title,md_path_obj
 
+@step_log("document_split_by_title")
 def document_split_by_title(md_content:str) -> list[dict[str,Any]]:
     chunks_title:list[dict[str,Any]] = []
     current_title:str|None = None
@@ -85,6 +87,7 @@ def document_split_by_title(md_content:str) -> list[dict[str,Any]]:
 """
 合适大小和边界清晰
 """
+@step_log("improve_chunk_size")
 def improve_chunk_size(chunks:list[dict[str,Any]]) -> list[dict[str,Any]]:
     logger.info(f"没有切割也没有合并的原始数据长度:{len(chunks)}")
     final_chunks:list[dict[str,Any]] = []
@@ -99,7 +102,7 @@ def improve_chunk_size(chunks:list[dict[str,Any]]) -> list[dict[str,Any]]:
     logger.info(f"按标题切割也进行了合并的数据长度:{len(final_chunks)}")
     return final_chunks
 
-
+@step_log("_content_split")
 def _content_split(chunk:dict[str,Any]) -> list[dict[str,Any]]:
     """本质使用递归切割器进行切割
         1.数据前置处理
@@ -137,7 +140,7 @@ def _content_split(chunk:dict[str,Any]) -> list[dict[str,Any]]:
     logger.info(f"已经完成{title}的内容切割,切割的数量等于{len(current_title_chunk)}")
     return current_title_chunk
 
-
+@step_log("_content_merge")
 def _content_merge(final_chunks:list[dict[str,Any]]) -> list[dict[str,Any]]:
     """
         短了合并:   条件一:同一个parent_title下面 条件二: content<400 条件三:合并后不能>1000
@@ -171,7 +174,7 @@ def _content_merge(final_chunks:list[dict[str,Any]]) -> list[dict[str,Any]]:
     logger.info(f"在合并之后的数据长度:{len(chunks)}")
     return chunks
 
-
+@step_log("append_chunk_meta_data")
 def append_chunk_meta_data(chunks:list[dict[str,Any]],file_title:str) -> list[dict[str,Any]]:
     for chunk in chunks:
         chunk["file_title"] = file_title
@@ -181,6 +184,7 @@ def append_chunk_meta_data(chunks:list[dict[str,Any]],file_title:str) -> list[di
             chunk["parent_title"] = chunk["title"]
     logger.info(f"已经完成chunk的所有元数据补充")
 
+@step_log("backup_chunks_json")
 def backup_chunks_json(chunks,md_path_obj:Path):
     chunks_json_obj:Path = md_path_obj.parent / "chunks.json"
     chunks_json_obj.write_text(json.dumps(chunks, indent=4, ensure_ascii=False),encoding="utf-8")
@@ -188,7 +192,7 @@ def backup_chunks_json(chunks,md_path_obj:Path):
     #    json.dump(chunks, f, indent=4, ensure_ascii=False)
     logger.info(f"已经完成{md_path_obj.name}对应切块内容的数据备份!")
 
-
+@step_log("split_document")
 def split_document(state: ImportGraphState) -> ImportGraphState:
     #1. 参数校验和数据获取
     md_content, file_title, md_path_obj = validates_and_get_data(state)

@@ -5,12 +5,12 @@ from pathlib import Path
 from app.process.import_.agent.state import ImportGraphState
 from app.rag.import_.config import MINERU_MODEL_VERSION, MINERU_DOWNLOAD_TIMEOUT_SECONDS, MINERU_POLL_TIMEOUT_SECONDS, \
     MINERU_POLL_INTERVAL_SECONDS
-from app.shared.runtime.logger import logger,PROJECT_ROOT
+from app.shared.runtime.logger import logger, PROJECT_ROOT, step_log
 from app.infra.config.providers import infra_config
 import requests
 import shutil   #shell util linux工具
 
-
+@step_log("validates_pdf_paths")
 def validates_pdf_paths(state: ImportGraphState) -> tuple[Path, Path]:
     pdf_path:str = state.get('pdf_path')
     local_dir:str = state.get('local_dir')
@@ -37,6 +37,7 @@ def validates_pdf_paths(state: ImportGraphState) -> tuple[Path, Path]:
         local_dir_obj.mkdir(parents=True,exist_ok=True)
     return pdf_path_obj,local_dir_obj
 
+@step_log("apply_mineru_get_upload_url")
 def apply_mineru_get_upload_url(pdf_file_name:str) -> tuple[str, str]:
     #https://mineru.net/apiManage/docs
     #4.1 组装对应的请求头 {token}
@@ -81,7 +82,7 @@ def apply_mineru_get_upload_url(pdf_file_name:str) -> tuple[str, str]:
 
     return batch_id,upload_file_url
 
-
+@step_log("upload_file_to_url")
 def upload_file_to_url(upload_file_url:str,pdf_path_obj:Path) -> None:
     """"
     Path 是一个路径的对象 | 对象的属性 | 路径对象的一些简单方法 数据读取 判断 校验...
@@ -108,7 +109,7 @@ def upload_file_to_url(upload_file_url:str,pdf_path_obj:Path) -> None:
         raise ValueError(f"向:{upload_file_url}地址上传文件,网络状态失败:{status_code},业务无法继续,提前终止!!")
 
 
-
+@step_log("poll_mineru_zip_url")
 def poll_mineru_zip_url(batch_id:str) -> str:
     max_timeout = MINERU_POLL_TIMEOUT_SECONDS
     interval_time = MINERU_POLL_INTERVAL_SECONDS
@@ -164,7 +165,7 @@ def poll_mineru_zip_url(batch_id:str) -> str:
             time.sleep(interval_time)  # 线程休眠!
             continue
 
-
+@step_log("down_load_and_extract_md")
 def down_load_and_extract_md(zip_file_url:str,local_dir_obj:Path,stem:str) -> str:
     response = requests.get(url=zip_file_url,timeout=MINERU_DOWNLOAD_TIMEOUT_SECONDS)
     status_code = response.status_code
@@ -243,7 +244,7 @@ def down_load_and_extract_md(zip_file_url:str,local_dir_obj:Path,stem:str) -> st
             异步动作
     """
 
-
+@step_log("parse_pdf_to_markdown")
 def parse_pdf_to_markdown(state: ImportGraphState) -> ImportGraphState:
     #1. 类型参数合理性校验
     pdf_path_obj,local_dir_obj = validates_pdf_paths(state)

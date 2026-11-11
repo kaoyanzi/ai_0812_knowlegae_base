@@ -7,7 +7,7 @@ from app.process.import_.agent.state import ImportGraphState
 from pathlib import Path
 
 from app.rag.import_.config import IMAGE_CONTEXT_CHAR_LENGTH, SUPPORTED_IMAGE_EXTENSIONS
-from app.shared.runtime.logger import logger
+from app.shared.runtime.logger import logger, step_log
 import re
 from app.infra.llm.providers import llm_provider
 from app.shared.runtime.load_prompt import load_prompt
@@ -15,6 +15,7 @@ from mimetypes import guess_type
 import base64
 from app.infra.object_storage.minio_gateway import minio_gateway
 
+@step_log("validates_and_get_data")
 def validates_and_get_data(state: ImportGraphState) -> tuple[str,Path,Path]:
     md_path:str = state.get('md_path')
     if not md_path:
@@ -29,7 +30,7 @@ def validates_and_get_data(state: ImportGraphState) -> tuple[str,Path,Path]:
     images_path_obj:Path = md_path_obj.parent / 'images'
     return md_content, md_path_obj, images_path_obj
 
-
+@step_log("scan_images_info")
 def scan_images_info(images_path_obj:Path,md_content:str) -> list[tuple[str,Path,tuple[str,str]]]:
     #获取所以图片信息
     generator  = images_path_obj.iterdir()
@@ -65,7 +66,7 @@ def scan_images_info(images_path_obj:Path,md_content:str) -> list[tuple[str,Path
     return images_info_list
 
 
-
+@step_log("summary_image_info")
 def summary_image_info(images_info:list[tuple[str,Path,tuple[str,str]]],root_folder:str) -> dict[str, str]:
     images_summary:dict[str, str] = {}
     vision_model = llm_provider.vision_chat()
@@ -95,6 +96,7 @@ def summary_image_info(images_info:list[tuple[str,Path,tuple[str,str]]],root_fol
     logger.info(f"已经完成{root_folder}文件夹中的所有图片内容总结,总结图片的内容对数为:{len(images_summary)}")
     return images_summary
 
+@step_log("upload_image_to_minio")
 def upload_image_to_minio(images_info:list[tuple[str,Path,tuple[str,str]]],stem) -> dict[str, str]:
     images_url:dict[str, str] = {}
     minio_client:Minio = minio_gateway.client
@@ -135,7 +137,7 @@ def upload_image_to_minio(images_info:list[tuple[str,Path,tuple[str,str]]],stem)
     logger.info(f"已经完成文件夹{stem}所有图片的上传,上传的数量为:{len(images_url)}")
     return images_url
 
-
+@step_log("replace_old_md_content")
 def replace_old_md_content(md_content:str,images_url:dict[str,str],images_summary:dict[str,str]) -> str:
     for image_name,image_url in images_url.items():
         summary:str = images_summary[image_name]
@@ -149,11 +151,13 @@ def replace_old_md_content(md_content:str,images_url:dict[str,str],images_summar
 
     return md_content
 
+@step_log("backup_md_return_path")
 def backup_md_return_path(md_content:str,md_path_obj:Path) -> str:
     new_path_md_obj:Path = md_path_obj.with_name(f"{md_path_obj.stem}_new.md")
     new_path_md_obj.write_text(data=md_content,encoding="utf-8")
     return str(new_path_md_obj)
 
+@step_log("enrich_markdown_images")
 def enrich_markdown_images(state: ImportGraphState) -> ImportGraphState:
     #1. 获取参数并校验
     md_content,md_path_obj,images_path_obj = validates_and_get_data(state)

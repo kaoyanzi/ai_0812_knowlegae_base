@@ -33,14 +33,14 @@ def after_entry_node(state:ImportGraphState) -> str:
         start -> 值 -> 返回目标节点名
         :return: 字符串 目标节点的名字 node_pdf_to_md | node_md_img | END
     """
-    if state.get("is_md_read_enabled"):
+    if state.get("is_md_read_enable"):
         #不为空 且为 TRUE
         #文件就是md
         #日志: 前因 后果 核心参数(佐证)
         logger.info(f"传入的文件是md,md_path:{state.get('md_path')},后续跳转到node_md_img节点")
         return "node_md_img"
 
-    elif state.get("is_pdf_read_enabled"):
+    elif state.get("is_pdf_read_enable"):
         # 不为空 且为 TRUE
         #文件是pdf
         logger.info(f"传入的文件是pdf,pdf_path:{state.get('pdf_path')},后续跳转到node_pdf_to_md节点")

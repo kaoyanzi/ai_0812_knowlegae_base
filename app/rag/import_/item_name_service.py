@@ -8,12 +8,12 @@ from pymilvus import MilvusClient, DataType
 
 from app.process.import_.agent.state import ImportGraphState
 from app.rag.import_.config import ITEM_NAME_RECOGNITION_CHUNKS_TOP_K
-from app.shared.runtime.logger import  logger
+from app.shared.runtime.logger import logger, step_log
 from app.infra.llm.providers import llm_provider
 from app.shared.runtime.load_prompt import load_prompt
 from app.infra.vectorstore.milvus_gateway import milvus_gateway
 
-
+@step_log("validate_and_get_data")
 def validate_and_get_data(state: ImportGraphState) -> tuple[str,list[dict[str, Any]]]:
     file_title = state.get("file_title")
     chunks:list[dict[str, Any]] = state.get("chunks")
@@ -36,7 +36,7 @@ def validate_and_get_data(state: ImportGraphState) -> tuple[str,list[dict[str, A
         file_title = "default_title"
 
     return file_title, chunks
-
+@step_log("call_llm_item_name_recognition")
 def call_llm_item_name_recognition(chunks:list[dict[str, Any]],file_title:str) -> str:
     llm_client = llm_provider.chat(json_model=False)
     context:str = ""
@@ -50,7 +50,7 @@ def call_llm_item_name_recognition(chunks:list[dict[str, Any]],file_title:str) -
         logger.warning(f"没有识别到item_title,给一个file_title对应的默认值:{file_title}")
         item_name = file_title
     return item_name
-
+@step_log("item_name_embedding")
 def item_name_embedding(item_name:str) -> tuple[list,dict]:
     #需要的是列表
     result = llm_provider.generate_infra_embeddings([item_name])
@@ -58,7 +58,7 @@ def item_name_embedding(item_name:str) -> tuple[list,dict]:
     dense_vector = result.get("dense")[0]
     sparse_vector = result.get("sparse")[0]
     return dense_vector, sparse_vector
-
+@step_log("prepared_item_name_collection")
 def prepared_item_name_collection():
     #检查集合是否存在
     milvus_client:MilvusClient = milvus_gateway.client
@@ -117,6 +117,7 @@ def prepared_item_name_collection():
         collection_name=milvus_gateway.item_name_collection,
     )
 
+@step_log("insert_item_name_collection")
 def insert_item_name_collection(item_name:str,dense_vector,sparse_vector,file_title):
     milvus_client:MilvusClient = milvus_gateway.client
     result = milvus_client.delete(
@@ -138,11 +139,12 @@ def insert_item_name_collection(item_name:str,dense_vector,sparse_vector,file_ti
     )
     logger.info(f"完成了{item_name}数据插入,影响条数为:{insert_result.get('insert_count')}")
 
+@step_log("improve_chunks_item_name")
 def improve_chunks_item_name(chunks,item_name):
     for chunk in chunks:
         chunk["item_name"] = item_name
 
-
+@step_log("recognize_and_index_item_name")
 def recognize_and_index_item_name(state: ImportGraphState) -> ImportGraphState:
     file_title,chunks = validate_and_get_data(state)
     item_name:str = call_llm_item_name_recognition(chunks,file_title)
