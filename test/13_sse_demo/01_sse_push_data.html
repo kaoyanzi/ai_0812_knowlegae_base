@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <div id="xdd"></div>
+</body>
+<script>
+
+    //1. 创建和后端连接的对象 EventSource(指定后端的持续返回数据接口)
+    let es = new EventSource("http://127.0.0.1:8000/stream/sse")
+
+    xxd_div = document.getElementById("xdd")
+
+    //2. 添加一个监听事件 -> 绑定一个函数 当后端返回数据,会调用函数形参传递数据
+    es.onmessage = function(xxx){
+         let data =  xxx.data  //后端返回数据包 data数
+         console.log(data)
+         xxd_div.innerText += data+"<br>"
+         //xxd_div.innerHTML += data+"<br>"
+    }
+
+
+</script>
+</html>

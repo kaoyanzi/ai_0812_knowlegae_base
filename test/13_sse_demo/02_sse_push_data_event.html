@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <br>
+    <br>
+    <br>
+   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;下载进度: <span id="sp">1</span>%
+
+</body>
+<script>
+
+    //1.和后端接口进行连接
+    es = new EventSource("http://127.0.0.1:8000/download")
+    //2. 定义监听函数 [适合没有事件区分]
+<!--    es.onmessage = function(event){-->
+<!--    }-->
+    sp = document.getElementById("sp")
+    es.addEventListener("progress",(event)=>{
+        sp.innerText = event.data
+    })
+
+    es.addEventListener("completed",(event)=>{
+        sp.innerHTML = event.data
+        es.close()
+    })
+
+
+</script>
+</html>
