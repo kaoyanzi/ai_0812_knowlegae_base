@@ -1,6 +1,6 @@
 import asyncio
 from fastapi import FastAPI, BackgroundTasks
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse,EventSourceResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -52,7 +52,8 @@ async def submit_task(session_id: str, background_tasks: BackgroundTasks):
 # 简化后的SSE接口：直接从队列取数据，没有轮询！
 @app.get("/stream/{session_id}")
 async def stream_result(session_id: str):
-    return StreamingResponse(event_generator(session_id), media_type="text/event-stream")
+    #return StreamingResponse(event_generator(session_id), media_type="text/event-stream")
+    return EventSourceResponse(event_generator(session_id))
 
 
 if __name__ == "__main__":

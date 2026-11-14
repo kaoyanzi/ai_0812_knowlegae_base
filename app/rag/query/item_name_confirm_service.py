@@ -1,4 +1,5 @@
 from app.process.query.agent.state import QueryGraphState
+from app.infra.persistence.history_repository import history_repository
 
 
 def confirm_item_name(state: QueryGraphState) -> QueryGraphState:
@@ -10,4 +11,14 @@ def confirm_item_name(state: QueryGraphState) -> QueryGraphState:
     4. 根据评分高低自动对齐标准型号，或生成反问让用户手动确认
     5. 同步历史记录到 MongoDB
     """
+    state["item_names"] = ["烫金机"]
+    #模拟添加聊天记录
+    history_repository.save_message(
+        session_id=state.get("session_id"),
+        role = "user",
+        text = state.get("original_query"),
+        rewritten_query = "烫金机是烫金子的吗",
+        item_names =state.get("item_names"),
+        image_urls = []
+    )
     return state
