@@ -24,7 +24,7 @@ query_graph_builder.set_entry_point("node_item_name_confirm")
 def after_node_item_name_confirm(state:QueryGraphState):
     if not state.get("item_names"):
         logger.warning(f"node_item_name_confirm_无法继续向后执行: {state['answer']}")
-        return END
+        return "node_answer_output"
     else:
         # 存在
         logger.info(f"识别到明确的item_names:{state.get('item_names')},正常进行多路并行检索!")
@@ -33,7 +33,7 @@ def after_node_item_name_confirm(state:QueryGraphState):
         # 优势1: 静态测试的时候明确输出多种可能性的图结构!
         # 优势2: 条件边返回的值不等于目标节点名,可以在此处进行映射!
 path_map: dict = {
-    END: END,
+    "node_answer_output": "node_answer_output",
     "node_search_embedding": "node_search_embedding",
     "node_search_embedding_hyde": "node_search_embedding_hyde",
     "node_web_search_mcp": "node_web_search_mcp"
