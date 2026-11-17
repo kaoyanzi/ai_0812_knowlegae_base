@@ -83,7 +83,7 @@ def summarize_long_rerank_text(question: str, answer: str, limit: int) -> str:
     ]
 
     llm_client = llm_provider.chat()
-    chains = llm_client | StrOutputParser
+    chains = llm_client | StrOutputParser()
 
     refined_answer = chains.invoke(messages)
 

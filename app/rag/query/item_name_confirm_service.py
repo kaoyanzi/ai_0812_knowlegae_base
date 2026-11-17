@@ -10,7 +10,8 @@ from app.process.query.agent.state import QueryGraphState
 from app.infra.persistence.history_repository import history_repository
 from app.rag.query.config import ITEM_NAME_CONFIRM_THRESHOLD, ITEM_NAME_CANDIDATE_THRESHOLD, ITEM_NAME_OPTIONS_TOPK
 from app.shared.runtime.load_prompt import load_prompt
-from app.shared.runtime.logger import logger
+from app.shared.runtime.logger import logger, step_log
+
 
 
 def validate_and_get_data(state:QueryGraphState) -> tuple[str,str]:
